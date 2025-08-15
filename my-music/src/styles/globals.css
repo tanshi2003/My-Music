@@ -1,0 +1,261 @@
+/* globals.css - full styling for your music grid app */
+
+/* -------- Base / Reset -------- */
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  background: linear-gradient(180deg,#071224 0%, #081426 60%, #0b1530 100%);
+  color: #e6eef8;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.25;
+}
+
+/* layout */
+main {
+  max-width: 1200px;
+  margin: 36px auto;
+  padding: 0 20px 80px;
+}
+
+/* top-level grid */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+
+/* song card base */
+.song-card {
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: transform .18s ease, box-shadow .18s ease;
+  cursor: pointer;
+  overflow: visible;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.55), inset 0 -1px 0 rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.03);
+}
+
+/* hover lift */
+.song-card:hover {
+  transform: translateY(-6px) scale(1.01);
+  box-shadow: 0 14px 40px rgba(0,0,0,0.65);
+}
+
+/* cover wrapper keeps aspect ratio square */
+.cover-wrapper {
+  position: relative;
+  width: 100%;
+  padding-top: 100%; /* 1:1 aspect */
+  border-radius: 10px;
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(0,0,0,0.18), rgba(0,0,0,0.28));
+}
+
+/* cover image fills the wrapper */
+.cover-wrapper img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform .28s cubic-bezier(.2,.9,.3,1);
+}
+
+/* subtle zoom on hover */
+.cover-wrapper:hover img {
+  transform: scale(1.06);
+}
+
+/* play button overlay centered */
+.play-button {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity .16s ease, transform .16s ease;
+  background: linear-gradient(180deg, rgba(0,0,0,0.0), rgba(0,0,0,0.45));
+}
+
+/* show when hovering the cover */
+.cover-wrapper:hover .play-button {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* SVG play icon */
+.play-button svg {
+  width: 48px;
+  height: 48px;
+  filter: drop-shadow(0 6px 14px rgba(0,0,0,0.6));
+}
+.play-button svg path {
+  fill: #ffffff;
+}
+
+/* title and artist */
+.song-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: #ffffff;
+  letter-spacing: 0.1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.song-artist {
+  font-size: 12px;
+  color: rgba(220,230,245,0.78);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* playing state (optional) */
+.song-card.playing {
+  outline: 2px solid rgba(96,165,250,0.14);
+  box-shadow: 0 18px 46px rgba(2,6,23,0.8), 0 0 0 4px rgba(96,165,250,0.03);
+}
+
+/* small screens */
+@media (max-width: 900px) {
+  .grid { gap: 14px; grid-template-columns: repeat(auto-fill, minmax(160px,1fr)); }
+  .play-button svg { width: 42px; height: 42px; }
+}
+@media (max-width: 480px) {
+  main { margin: 20px auto; padding-bottom: 40px; }
+  .grid { grid-template-columns: repeat(2,1fr); gap: 12px; }
+  .song-title { font-size: 13px; }
+  .song-artist { font-size: 11px; }
+}
+
+/* a11y focus */
+.song-card:focus-within,
+.song-card:focus {
+  box-shadow: 0 10px 36px rgba(0,0,0,0.7);
+  transform: translateY(-4px);
+  outline: 2px solid rgba(255,255,255,0.04);
+}
+
+/* keep images sharp and load nicely */
+img { image-rendering: auto; -webkit-user-drag: none; user-select: none; }
+
+.player-controls {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.player-controls button {
+  background: #1e293b;
+  border: none;
+  padding: 10px 14px;
+  border-radius: 6px;
+  color: white;
+  font-size: 18px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.player-controls button:hover {
+  background: #334155;
+}
+
+.player-controls button.active {
+  background: #3b82f6;
+}
+
+.now-playing {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #111b;
+  color: #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 28px;
+  gap: 18px;
+  z-index: 100;
+  box-shadow: 0 -2px 24px #000a;
+}
+
+.now-playing .cover {
+  width: 54px;
+  height: 54px;
+  border-radius: 8px;
+  object-fit: cover;
+  margin-right: 14px;
+  box-shadow: 0 2px 12px #0007;
+}
+
+.now-playing .info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  flex: 1 1 0%;
+  overflow: hidden;
+  gap: 2px;
+}
+
+.now-playing .info div:first-child {
+  font-weight: 600;
+  font-size: 15px;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.now-playing .info div:last-child {
+  font-size: 13px;
+  color: #b6c3d6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.now-playing .controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: 24px;
+}
+
+.now-playing .controls button {
+  background: none;
+  border: none;
+  color: #e2e8f0;
+  font-size: 22px;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 5px;
+  transition: background 0.15s;
+}
+
+.now-playing .controls button:hover {
+  background: #222c;
+}
+
+.song-card.playing {
+  outline: 2px solid #3b82f6;
+}
+
+/* Hide Next.js Fast Refresh overlay */
+#__next-route-announcer,
+.nextjs-portal {
+  display: none !important;
+}

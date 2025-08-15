@@ -1,0 +1,121 @@
+[
+  {
+    "id": "1",
+    "title": "Aaj Ke Baad",
+    "artist": "Manan Bhardwaj & Tulsi Kumar",
+    "src": "/music/1.mp3",
+    "cover": "/music/covers/1.jpg"
+  },
+  {
+    "id": "2",
+    "title": "Closer",
+    "artist": "The Chainsmokers ft. Halsey",
+    "src": "/music/2.mp3",
+    "cover": "/music/covers/2.jpg"
+  },
+  {
+    "id": "3",
+    "title": "Dil Se Dil Tak",
+    "artist": "Laqshay Kapoor, Akashdeep Sengupta, Suvarna Tiwari",
+    "src": "/music/3.mp3",
+    "cover": "/music/covers/3.jpg"
+  },
+  {
+    "id": "4",
+    "title": "Jalebi",
+    "artist": "Tesher (feat. Jason Derulo remix)",
+    "src": "/music/4.mp3",
+    "cover": "/music/covers/4.jpeg"
+  },
+  {
+    "id": "5",
+    "title": "Janiye",
+    "artist": "Vishal Mishra ft. Rashmeet Kaur",
+    "src": "/music/5.mp3",
+    "cover": "/music/covers/5.jpg"
+  },
+  {
+    "id": "6",
+    "title": "Naina",
+    "artist": "Arijit Singh (composer: Pritam)",
+    "src": "/music/6.mp3",
+    "cover": "/music/covers/6.jpg"
+  },
+  {
+    "id": "7",
+    "title": "Pehle Bhi Main",
+    "artist": "Vishal Mishra",
+    "src": "/music/7.mp3",
+    "cover": "/music/covers/7.jpg"
+  },
+  {
+    "id": "8",
+    "title": "Love Story",
+    "artist": "Taylor Swift",
+    "src": "/music/8.mp3",
+    "cover": "/music/covers/8.png"
+  },
+  {
+    "id": "9",
+    "title": "Tum Kya Mile",
+    "artist": "Arijit Singh, Shreya Ghoshal (composer: Pritam, lyrics: Amitabh Bhattacharya)",
+    "src": "/music/9.mp3",
+    "cover": "/music/covers/9.jpg"
+  },
+  {
+    "id": "10",
+    "title": "What Jhumka",
+    "artist": "Arijit Singh, Jonita Gandhi (composer: Pritam, lyrics: Amitabh Bhattacharya)",
+    "src": "/music/10.mp3",
+    "cover": "/music/covers/10.jpg"
+  },
+  {
+    "id": "11",
+    "title": "Paaro",
+    "artist": "Aditya Rikhari, UNPLG'd",
+    "src": "/music/11.mp3",
+    "cover": "/music/covers/11.jpeg"
+  },
+  {
+    "id": "12",
+    "title": "Aavan Jaavan",
+    "artist": "Arijit Singh, Nikhita Gandhi (composer: Pritam, lyrics: Amitabh Bhattacharya)",
+    "src": "/music/12.mp3",
+    "cover": "/music/covers/12.jpeg"
+  },
+  {
+    "id": "13",
+    "title": "Bheegi Saree",
+    "artist": "Adnan Sami, Shreya Ghoshal (composer: Sachin–Jigar, lyrics: Amitabh Bhattacharya)",
+    "src": "/music/13.mp3",
+    "cover": "/music/covers/13.jpeg"
+  },
+  {
+    "id": "14",
+    "title": "Pal Pal",
+    "artist": "AFusic (feat. AliSoomroMusic)",
+    "src": "/music/14.mp3",
+    "cover": "/music/covers/14.jpeg"
+  },
+  {
+    "id": "15",
+    "title": "Pardesiya",
+    "artist": "Sonu Nigam, Krishnakali Saha (composer: Sachin–Jigar, lyrics: Amitabh Bhattacharya)",
+    "src": "/music/15.mp3",
+    "cover": "/music/covers/15.jpeg"
+  },
+  {
+    "id": "16",
+    "title": "Saiyaara",
+    "artist": "Faheem Abdullah (composer: Tanishk Bagchi, Faheem Abdullah, Arslan Nizami; lyrics: Irshad Kamil)",
+    "src": "/music/16.mp3",
+    "cover": "/music/covers/16.jpeg"
+  },
+  {
+    "id": "17",
+    "title": "Thodi Si Daru",
+    "artist": "AP Dhillon, Shreya Ghoshal",
+    "src": "/music/17.mp3",
+    "cover": "/music/covers/17.jpeg"
+  }
+]
