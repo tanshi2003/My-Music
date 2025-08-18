@@ -1,13 +1,17 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 
 // 🎵 Main Music Player Component
 export default function Home() {
   const [currentSong, setCurrentSong] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [shuffleOn, setShuffleOn] = useState(false);
-  const [repeatOn, setRepeatOn] = useState(false);
   const [volume, setVolume] = useState(0.7); // default volume
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
   const audioRef = useRef(null);
+
+  const [shuffle, setShuffle] = useState(false);
+  const [repeat, setRepeat] = useState(false);
+  const [search, setSearch] = useState("");
 
   const songs = [
     { id: "1", title: "Aaj Ke Baad", artist: "Manan Bhardwaj & Tulsi Kumar", src: "/music/1.mp3", cover: "/music/covers/1.jpg" },
@@ -29,37 +33,40 @@ export default function Home() {
     { id: "17", title: "Thodi Si Daru", artist: "AP Dhillon, Shreya Ghoshal", src: "/music/17.mp3", cover: "/music/covers/17.jpeg" },
   ];
 
+  const filteredSongs = songs.filter(song =>
+    song.title.toLowerCase().includes(search.toLowerCase()) ||
+    song.artist.toLowerCase().includes(search.toLowerCase())
+  );
+
   // ▶️ Play a specific song
   const playSong = (song) => {
     setCurrentSong(song);
     setIsPlaying(true);
-    if (audioRef.current) {
-      audioRef.current.src = song.src;
-      audioRef.current.play();
-    }
   };
 
   // ⏯ Toggle play/pause
   const togglePlay = () => {
     if (!audioRef.current) return;
-    if (isPlaying) {
-      audioRef.current.pause();
-    } else {
+    if (audioRef.current.paused) {
       audioRef.current.play();
+      setIsPlaying(true);
+    } else {
+      audioRef.current.pause();
+      setIsPlaying(false);
     }
-    setIsPlaying(!isPlaying);
   };
 
   // ⏩ Next Song
   const playNext = () => {
     if (!currentSong) return;
-    let currentIndex = songs.findIndex(s => s.id === currentSong.id);
-    if (shuffleOn) {
-      currentIndex = Math.floor(Math.random() * songs.length);
-    } else {
-      currentIndex = (currentIndex + 1) % songs.length;
+    if (shuffle) {
+      playRandom();
+      return;
     }
-    playSong(songs[currentIndex]);
+    let currentIndex = songs.findIndex(s => s.id === currentSong.id);
+    currentIndex = (currentIndex + 1) % songs.length;
+    setCurrentSong(songs[currentIndex]);
+    setIsPlaying(true);
   };
 
   // ⏪ Previous Song
@@ -67,7 +74,26 @@ export default function Home() {
     if (!currentSong) return;
     let currentIndex = songs.findIndex(s => s.id === currentSong.id);
     currentIndex = (currentIndex - 1 + songs.length) % songs.length;
-    playSong(songs[currentIndex]);
+    setCurrentSong(songs[currentIndex]);
+    setIsPlaying(true);
+  };
+
+  // Shuffle logic
+  const playRandom = () => {
+    if (songs.length === 0) return;
+    let idx = Math.floor(Math.random() * songs.length);
+    setCurrentSong(songs[idx]);
+    setIsPlaying(true);
+  };
+
+  // Repeat/loop logic
+  const handleSongEnd = () => {
+    if (repeat) {
+      audioRef.current.currentTime = 0;
+      audioRef.current.play();
+    } else {
+      shuffle ? playRandom() : playNext();
+    }
   };
 
   // 🔊 Handle volume change
@@ -79,147 +105,231 @@ export default function Home() {
     }
   };
 
-  return (
-    <main>
-      <h1 className="main-heading">
-        <img src="/logo.jpg" alt="Logo" style={{ height: "40px", verticalAlign: "middle" }} /> My Music
-      </h1>
+  // ⏭ Seek within the song
+  const handleSeek = (e) => {
+    const seekTime = (parseFloat(e.target.value) / 100) * duration;
+    if (audioRef.current) {
+      audioRef.current.currentTime = seekTime;
+    }
+  };
 
-      {/* Song Grid */}
-      <div className="grid">
-        {songs.map((song) => (
-          <div className="song-card" key={song.id} onClick={() => playSong(song)}>
-            <img src={song.cover} alt={song.title} />
-            <div className="song-title">{song.title}</div>
-            <div className="song-artist">{song.artist}</div>
-          </div>
-        ))}
-      </div>
+  // ⏱ Format time for display
+  const formatTime = (sec) => {
+    if (isNaN(sec)) return "0:00";
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return `${m}:${s < 10 ? "0" : ""}${s}`;
+  };
+
+  // 🔄 Update audio source and play/pause state reliably
+  // Effect 1: Handle song changes & play/pause
+useEffect(() => {
+  if (!audioRef.current) return;
+  if (currentSong) {
+    audioRef.current.src = currentSong.src;
+    audioRef.current.load();
+    if (isPlaying) {
+      audioRef.current.play();
+    } else {
+      audioRef.current.pause();
+    }
+  }
+}, [currentSong, isPlaying]);
+
+// Effect 2: Handle only volume change
+useEffect(() => {
+  if (audioRef.current) {
+    audioRef.current.volume = volume;
+  }
+}, [volume]);
+
+
+  // ⏲ Update currentTime and duration state from audio element
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const updateTime = () => {
+      setCurrentTime(audio.currentTime);
+      setDuration(audio.duration || 0);
+    };
+    audio.addEventListener("timeupdate", updateTime);
+    audio.addEventListener("loadedmetadata", updateTime);
+    return () => {
+      audio.removeEventListener("timeupdate", updateTime);
+      audio.removeEventListener("loadedmetadata", updateTime);
+    };
+  }, [audioRef, currentSong]);
+
+  // ⌨️ Keyboard and media keys support
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.code === "ArrowRight") {
+        // Seek forward 5s
+        if (audioRef.current) audioRef.current.currentTime = Math.min(audioRef.current.currentTime + 5, duration);
+      }
+      if (e.code === "ArrowLeft") {
+        // Seek backward 5s
+        if (audioRef.current) audioRef.current.currentTime = Math.max(audioRef.current.currentTime - 5, 0);
+      }
+      if (e.code === "MediaTrackNext") playNext();
+      if (e.code === "MediaTrackPrevious") playPrev();
+      if (e.code === "MediaPlayPause") togglePlay();
+      if (e.code === "Space" && document.activeElement.tagName !== "INPUT") {
+        togglePlay();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  });
+
+  // 📊 Play/pause when clicking progress bar
+  const handleProgressClick = (e) => {
+    const rect = e.target.getBoundingClientRect();
+    const percent = (e.clientX - rect.left) / rect.width;
+    const seekTime = percent * duration;
+    if (audioRef.current) {
+      audioRef.current.currentTime = seekTime;
+    }
+  };
+
+  return (
+    <div className="app-layout">
+      {/* Sidebar */}
+      <aside className="sidebar">
+        <div className="sidebar-logo">
+          <img src="/logo.jpg" alt="Logo" />
+        </div>
+        <nav>
+          {/* Remove heart button */}
+        </nav>
+        <div className="sidebar-playlists">
+          {/* Playlist thumbnails - clickable */}
+          {songs.slice(0, 8).map(song => (
+            <img
+              key={song.id}
+              src={song.cover}
+              alt={song.title}
+              className="sidebar-thumb"
+              style={{ cursor: "pointer" }}
+              onClick={() => playSong(song)}
+              title={song.title}
+            />
+          ))}
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <main className="main-content">
+        <div className="search-bar">
+          <input
+            type="text"
+            placeholder="Find in Liked Songs"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
+        <header className="playlist-header">
+          <h2>Liked Songs</h2>
+        </header>
+        <div className="song-list">
+          {filteredSongs.map((song) => (
+            <div
+              className={`song-row${currentSong && currentSong.id === song.id ? " playing" : ""}`}
+              key={song.id}
+              onClick={() => playSong(song)}
+              tabIndex={0}
+            >
+              <img src={song.cover} alt={song.title} className="song-thumb" />
+              <div className="song-meta">
+                <div className="song-title">{song.title}</div>
+                <div className="song-artist">{song.artist}</div>
+              </div>
+              <div className="song-extra">
+                <span className="song-duration">{formatTime(song.duration || 210)}</span>
+                <button className="song-options" tabIndex={-1}>
+                  <i className="fa-solid fa-ellipsis"></i>
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </main>
 
       {/* Now Playing Bar */}
-      {currentSong && (
-        <div className="now-playing">
-          <img src={currentSong.cover} alt={currentSong.title} className="cover" />
-          <div className="info">
-            <div>{currentSong.title}</div>
-            <div>{currentSong.artist}</div>
-          </div>
-          <div className="player-controls">
-            <button onClick={playPrev}><i className="fa-solid fa-backward-step"></i></button>
-            <button onClick={togglePlay}>
-              <i className={isPlaying ? "fa-solid fa-pause" : "fa-solid fa-play"}></i>
-            </button>
-            <button onClick={playNext}><i className="fa-solid fa-forward-step"></i></button>
-            <button onClick={() => setShuffleOn(!shuffleOn)} style={{ color: shuffleOn ? "#1db954" : "white" }}>
-              <i className="fa-solid fa-shuffle"></i>
-            </button>
-            <button onClick={() => setRepeatOn(!repeatOn)} style={{ color: repeatOn ? "#1db954" : "white" }}>
-              <i className="fa-solid fa-repeat"></i>
-            </button>
-            <div className="volume-control">
-              <i className="fa-solid fa-volume-high"></i>
+      <footer className="now-playing-bar">
+        {currentSong && (
+          <>
+            <img src={currentSong.cover} alt={currentSong.title} className="np-thumb" />
+            <div className="np-meta">
+              <div className="np-title">{currentSong.title}</div>
+              <div className="np-artist">{currentSong.artist}</div>
+            </div>
+            <div className="np-controls">
+              {/* Shuffle */}
+              <button
+                className={shuffle ? "active" : ""}
+                onClick={() => setShuffle(!shuffle)}
+                title="Shuffle"
+              >
+                <i className="fa-solid fa-shuffle"></i>
+              </button>
+              {/* Previous */}
+              <button onClick={playPrev} title="Previous">
+                <i className="fa-solid fa-backward-step"></i>
+              </button>
+              {/* Play/Pause */}
+              <button onClick={togglePlay} title={isPlaying ? "Pause" : "Play"}>
+                <i className={isPlaying ? "fa-solid fa-pause" : "fa-solid fa-play"}></i>
+              </button>
+              {/* Next */}
+              <button onClick={playNext} title="Next">
+                <i className="fa-solid fa-forward-step"></i>
+              </button>
+              {/* Repeat/Loop */}
+              <button
+                className={repeat ? "active" : ""}
+                onClick={() => setRepeat(!repeat)}
+                title="Repeat"
+              >
+                <i className="fa-solid fa-repeat"></i>
+              </button>
+              {/* Progress Bar (seek) */}
+              <input
+                type="range"
+                min="0"
+                max="100"
+                step="0.1"
+                value={duration ? (currentTime / duration) * 100 : 0}
+                onInput={handleSeek}
+                className="np-progress"
+              />
+              <span className="np-time">{formatTime(currentTime)} / {formatTime(duration)}</span>
+              {/* Volume */}
               <input
                 type="range"
                 min="0"
                 max="1"
                 step="0.01"
                 value={volume}
-                onChange={handleVolumeChange}
-                aria-label="Volume"
+                onInput={handleVolumeChange}
+                className="np-volume"
               />
             </div>
-          </div>
-          <audio
-            ref={audioRef}
-            onEnded={repeatOn ? () => audioRef.current.play() : playNext}
-            volume={volume}
-            autoPlay
-          ></audio>
-        </div>
-      )}
-
-      {/* Styles */}
-      <style jsx>{`
-        .main-heading {
-          font-family: 'Segoe UI', sans-serif;
-          font-size: 2.5rem;
-          text-align: center;
-          margin: 30px 0;
-          color: white;
-        }
-        .grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-          gap: 15px;
-          padding: 20px;
-        }
-        .song-card {
-          background: #222;
-          color: white;
-          border-radius: 10px;
-          padding: 10px;
-          cursor: pointer;
-          text-align: center;
-          transition: transform 0.2s;
-        }
-        .song-card:hover {
-          transform: scale(1.05);
-        }
-        .song-card img {
-          width: 100%;
-          border-radius: 8px;
-        }
-        .now-playing {
-          position: fixed;
-          bottom: 0;
-          left: 0;
-          right: 0;
-          background: #111;
-          color: white;
-          display: flex;
-          align-items: center;
-          padding: 10px;
-          gap: 10px;
-        }
-        .cover {
-          width: 50px;
-          height: 50px;
-          object-fit: cover;
-        }
-        .player-controls {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-        .player-controls button {
-          background: none;
-          border: none;
-          color: white;
-          font-size: 20px;
-          cursor: pointer;
-          margin: 0 5px;
-        }
-        .volume-control {
-          display: flex;
-          align-items: center;
-          gap: 4px;
-          margin-left: 12px;
-        }
-        .volume-control input[type="range"] {
-          width: 80px;
-          accent-color: #1db954;
-          cursor: pointer;
-        }
-        .volume-control i {
-          font-size: 18px;
-        }
-      `}</style>
+            <audio
+              ref={audioRef}
+              src={currentSong.src}
+              autoPlay
+              onEnded={handleSongEnd}
+            />
+          </>
+        )}
+      </footer>
 
       {/* Font Awesome CDN */}
       <link
         rel="stylesheet"
         href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
       />
-    </main>
+    </div>
   );
 }
