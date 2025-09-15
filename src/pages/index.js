@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import Queue from '../components/Queue';
 
 // 🎵 Main Music Player Component
 export default function Home() {
@@ -12,6 +13,13 @@ export default function Home() {
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState(false);
   const [search, setSearch] = useState("");
+
+  const [optionsMenu, setOptionsMenu] = useState({ open: false, songId: null });
+  const [queue, setQueue] = useState([]);
+  const [isQueueOpen, setIsQueueOpen] = useState(false); // Queue visibility state
+  const [showQueue, setShowQueue] = useState(false); // For the new queue button state
+
+  const [songDurations, setSongDurations] = useState({});
 
   const songs = [
     { id: "1", title: "Aaj Ke Baad", artist: "Manan Bhardwaj & Tulsi Kumar", src: "/music/1.mp3", cover: "/music/covers/1.jpg" },
@@ -39,9 +47,15 @@ export default function Home() {
   );
 
   // ▶️ Play a specific song
-  const playSong = (song) => {
+  const playSong = async (song) => {
     setCurrentSong(song);
     setIsPlaying(true);
+    
+    if (audioRef.current) {
+      audioRef.current.src = song.src;
+      audioRef.current.load();
+      audioRef.current.play();
+    }
   };
 
   // ⏯ Toggle play/pause
@@ -86,11 +100,53 @@ export default function Home() {
     setIsPlaying(true);
   };
 
-  // Repeat/loop logic
+  // Update these functions
+  const addToQueue = (song) => {
+    if (!queue.some(s => s.id === song.id)) {
+      setQueue(prevQueue => [...prevQueue, song]);
+    }
+    // Close the options menu
+    setOptionsMenu({ open: false, songId: null });
+  };
+
+  const playNextSong = (song) => {
+    if (!currentSong) {
+      playSong(song);
+      return;
+    }
+
+    setQueue(prevQueue => {
+      const newQueue = [...prevQueue];
+      const currentIndex = newQueue.findIndex(s => s.id === currentSong.id);
+      
+      if (currentIndex === -1) {
+        newQueue.unshift(song);
+      } else {
+        newQueue.splice(currentIndex + 1, 0, song);
+      }
+      
+      return newQueue;
+    });
+
+    setOptionsMenu({ open: false, songId: null });
+  };
+
+  // Add this function to handle queue completion
+  const handleQueueEnd = () => {
+    if (queue.length > 0) {
+      const nextSong = queue[0];
+      setQueue(prev => prev.slice(1));
+      playSong(nextSong);
+    }
+  };
+
+  // Update handleSongEnd to include queue
   const handleSongEnd = () => {
     if (repeat) {
       audioRef.current.currentTime = 0;
       audioRef.current.play();
+    } else if (queue.length > 0) {
+      handleQueueEnd();
     } else {
       shuffle ? playRandom() : playNext();
     }
@@ -114,11 +170,11 @@ export default function Home() {
   };
 
   // ⏱ Format time for display
-  const formatTime = (sec) => {
-    if (isNaN(sec)) return "0:00";
-    const m = Math.floor(sec / 60);
-    const s = Math.floor(sec % 60);
-    return `${m}:${s < 10 ? "0" : ""}${s}`;
+  const formatTime = (seconds) => {
+    if (!seconds || isNaN(seconds)) return "0:00";
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
   // 🔄 Update audio source and play/pause state reliably
@@ -192,6 +248,35 @@ useEffect(() => {
     }
   };
 
+  // Add this function to calculate duration
+  const calculateDuration = (songId, audioUrl) => {
+    const audio = new Audio(audioUrl);
+    audio.addEventListener('loadedmetadata', () => {
+      setSongDurations(prev => ({
+        ...prev,
+        [songId]: audio.duration
+      }));
+    });
+  };
+const menuRef = useRef(null);
+
+useEffect(() => {
+  const handleClickOutside = (e) => {
+    if (menuRef.current && !menuRef.current.contains(e.target)) {
+      setOptionsMenu({ open: false, songId: null });
+    }
+  };
+  document.addEventListener("mousedown", handleClickOutside);
+  return () => document.removeEventListener("mousedown", handleClickOutside);
+}, []);
+
+  // Add useEffect to calculate durations when component mounts
+  useEffect(() => {
+    songs.forEach(song => {
+      calculateDuration(song.id, song.src);
+    });
+  }, []);
+
   return (
     <div className="app-layout">
       {/* Sidebar */}
@@ -220,6 +305,9 @@ useEffect(() => {
 
       {/* Main Content */}
       <main className="main-content">
+        <header className="playlist-header">
+          <h2>Liked Songs</h2>
+        </header>
         <div className="search-bar">
           <input
             type="text"
@@ -228,9 +316,7 @@ useEffect(() => {
             onChange={e => setSearch(e.target.value)}
           />
         </div>
-        <header className="playlist-header">
-          <h2>Liked Songs</h2>
-        </header>
+        
         <div className="song-list">
           {filteredSongs.map((song) => (
             <div
@@ -239,16 +325,48 @@ useEffect(() => {
               onClick={() => playSong(song)}
               tabIndex={0}
             >
-              <img src={song.cover} alt={song.title} className="song-thumb" />
+              <img src={song.cover} className="song-thumb" alt={song.title} />
               <div className="song-meta">
                 <div className="song-title">{song.title}</div>
                 <div className="song-artist">{song.artist}</div>
               </div>
               <div className="song-extra">
-                <span className="song-duration">{formatTime(song.duration || 210)}</span>
-                <button className="song-options" tabIndex={-1}>
-                  <i className="fa-solid fa-ellipsis"></i>
-                </button>
+                <span className="song-duration">
+                  {formatTime(songDurations[song.id] || 0)}
+                </span>
+
+                <div className="song-options-wrapper">
+                  <button
+                    className="song-options"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOptionsMenu({ open: true, songId: song.id });
+                    }}
+                  >
+                    <i className="fas fa-ellipsis-v"></i>
+                  </button>
+
+                  {optionsMenu.open && optionsMenu.songId === song.id && (
+                    <div className="song-options-menu" ref={menuRef}>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          playNextSong(song);
+                        }}
+                      >
+                        <i className="fas fa-forward-step"></i> Play Next
+                      </button>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          addToQueue(song);
+                        }}
+                      >
+                        <i className="fas fa-list"></i> Add to Queue
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           ))}
@@ -256,16 +374,18 @@ useEffect(() => {
       </main>
 
       {/* Now Playing Bar */}
-      <footer className="now-playing-bar">
-        {currentSong && (
-          <>
+      {currentSong && (
+        <div className="now-playing">
+          <div className="now-playing-info">
             <img src={currentSong.cover} alt={currentSong.title} className="np-thumb" />
             <div className="np-meta">
               <div className="np-title">{currentSong.title}</div>
               <div className="np-artist">{currentSong.artist}</div>
             </div>
-            <div className="np-controls">
-              {/* Shuffle */}
+          </div>
+
+          <div className="player-controls-container">
+            <div className="now-playing-controls">
               <button
                 className={shuffle ? "active" : ""}
                 onClick={() => setShuffle(!shuffle)}
@@ -273,19 +393,19 @@ useEffect(() => {
               >
                 <i className="fa-solid fa-shuffle"></i>
               </button>
-              {/* Previous */}
               <button onClick={playPrev} title="Previous">
                 <i className="fa-solid fa-backward-step"></i>
               </button>
-              {/* Play/Pause */}
-              <button onClick={togglePlay} title={isPlaying ? "Pause" : "Play"}>
+              <button 
+                onClick={togglePlay} 
+                title={isPlaying ? "Pause" : "Play"}
+                className="play-button-main"
+              >
                 <i className={isPlaying ? "fa-solid fa-pause" : "fa-solid fa-play"}></i>
               </button>
-              {/* Next */}
               <button onClick={playNext} title="Next">
                 <i className="fa-solid fa-forward-step"></i>
               </button>
-              {/* Repeat/Loop */}
               <button
                 className={repeat ? "active" : ""}
                 onClick={() => setRepeat(!repeat)}
@@ -293,7 +413,9 @@ useEffect(() => {
               >
                 <i className="fa-solid fa-repeat"></i>
               </button>
-              {/* Progress Bar (seek) */}
+            </div>
+
+            <div className="np-progress-container">
               <input
                 type="range"
                 min="0"
@@ -303,33 +425,55 @@ useEffect(() => {
                 onInput={handleSeek}
                 className="np-progress"
               />
-              <span className="np-time">{formatTime(currentTime)} / {formatTime(duration)}</span>
-              {/* Volume */}
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.01"
-                value={volume}
-                onInput={handleVolumeChange}
-                className="np-volume"
-              />
+              <span className="np-time">
+                {formatTime(currentTime)} / {formatTime(duration)}
+              </span>
             </div>
-            <audio
-              ref={audioRef}
-              src={currentSong.src}
-              autoPlay
-              onEnded={handleSongEnd}
+          </div>
+
+          <div className="volume-queue-controls">
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={volume}
+              onInput={handleVolumeChange}
+              className="np-volume"
             />
-          </>
-        )}
-      </footer>
+            <button 
+              className={`queue-button ${showQueue ? 'active' : ''}`} 
+              onClick={() => setShowQueue(prev => !prev)} 
+              title="Show Queue"
+            >
+              <i className="fas fa-list"></i>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Audio Element - Hidden */}
+      <audio 
+        ref={audioRef}
+        onEnded={handleSongEnd}
+        onError={(e) => console.error("Audio error:", e)}
+      />
 
       {/* Font Awesome CDN */}
       <link
         rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
       />
+
+      {/* Queue Component - Conditional Rendering */}
+      {showQueue && (
+        <Queue
+          queue={queue}
+          currentSong={currentSong}
+          onSongClick={playSong}
+          onClose={() => setShowQueue(false)}
+        />
+      )}
     </div>
   );
 }
