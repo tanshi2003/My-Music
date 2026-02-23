@@ -1,317 +1,259 @@
 import { useState, useRef, useEffect } from "react";
+import { motion, useReducedMotion } from "framer-motion";
+import Link from "next/link";
 import Queue from '../components/Queue';
+import LoveButton from '../components/LoveButton';
+import Visualizer from '../components/Visualizer';
+import { songs } from "../data/songs";
+import { usePlayer } from "../context/PlayerContext";
 
 // 🎵 Main Music Player Component
 export default function Home() {
-  const [currentSong, setCurrentSong] = useState(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [volume, setVolume] = useState(0.7); // default volume
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const audioRef = useRef(null);
+  const {
+    audioRef,
+    currentSong,
+    isPlaying,
+    playSong,
+    togglePlay,
+    playNext,
+    playPrev,
+    currentTime,
+    duration,
+    handleSeek,
+    volume,
+    handleVolumeChange,
+    toggleLove,
+    lovedSongs,
+    queue,
+    enqueue,
+    insertNext
+  } = usePlayer();
 
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState(false);
   const [search, setSearch] = useState("");
 
   const [optionsMenu, setOptionsMenu] = useState({ open: false, songId: null });
-  const [queue, setQueue] = useState([]);
   const [isQueueOpen, setIsQueueOpen] = useState(false); // Queue visibility state
   const [showQueue, setShowQueue] = useState(false); // For the new queue button state
 
   const [songDurations, setSongDurations] = useState({});
+  const [playlists, setPlaylists] = useState([]);
+  const [currentPlaylist, setCurrentPlaylist] = useState(null);
+  const [playlistMenu, setPlaylistMenu] = useState({ open: false, songId: null });
+  const [newPlaylistName, setNewPlaylistName] = useState('');
+  const [showLovedOnly, setShowLovedOnly] = useState(false);
+  const [showVisualizer, setShowVisualizer] = useState(false);
 
-  const songs = [
-    { id: "1", title: "Aaj Ke Baad", artist: "Manan Bhardwaj & Tulsi Kumar", src: "/music/1.mp3", cover: "/music/covers/1.jpg" },
-    { id: "2", title: "Closer", artist: "The Chainsmokers ft. Halsey", src: "/music/2.mp3", cover: "/music/covers/2.jpg" },
-    { id: "3", title: "Dil Se Dil Tak", artist: "Laqshay Kapoor, Akashdeep Sengupta, Suvarna Tiwari", src: "/music/3.mp3", cover: "/music/covers/3.jpg" },
-    { id: "4", title: "Jalebi", artist: "Tesher (feat. Jason Derulo remix)", src: "/music/4.mp3", cover: "/music/covers/4.jpeg" },
-    { id: "5", title: "Janiye", artist: "Vishal Mishra ft. Rashmeet Kaur", src: "/music/5.mp3", cover: "/music/covers/5.jpg" },
-    { id: "6", title: "Naina", artist: "Arijit Singh (composer: Pritam)", src: "/music/6.mp3", cover: "/music/covers/6.jpg" },
-    { id: "7", title: "Pehle Bhi Main", artist: "Vishal Mishra", src: "/music/7.mp3", cover: "/music/covers/7.jpg" },
-    { id: "8", title: "Love Story", artist: "Taylor Swift", src: "/music/8.mp3", cover: "/music/covers/8.png" },
-    { id: "9", title: "Tum Kya Mile", artist: "Arijit Singh, Shreya Ghoshal", src: "/music/9.mp3", cover: "/music/covers/9.jpg" },
-    { id: "10", title: "What Jhumka", artist: "Arijit Singh, Jonita Gandhi", src: "/music/10.mp3", cover: "/music/covers/10.jpg" },
-    { id: "11", title: "Paaro", artist: "Aditya Rikhari, UNPLG'd", src: "/music/11.mp3", cover: "/music/covers/11.jpeg" },
-    { id: "12", title: "Aavan Jaavan", artist: "Arijit Singh, Nikhita Gandhi", src: "/music/12.mp3", cover: "/music/covers/12.jpeg" },
-    { id: "13", title: "Bheegi Saree", artist: "Adnan Sami, Shreya Ghoshal", src: "/music/13.mp3", cover: "/music/covers/13.jpeg" },
-    { id: "14", title: "Pal Pal", artist: "AFusic (feat. AliSoomroMusic)", src: "/music/14.mp3", cover: "/music/covers/14.jpeg" },
-    { id: "15", title: "Pardesiya", artist: "Sonu Nigam, Krishnakali Saha", src: "/music/15.mp3", cover: "/music/covers/15.jpeg" },
-    { id: "16", title: "Saiyaara", artist: "Faheem Abdullah", src: "/music/16.mp3", cover: "/music/covers/16.jpeg" },
-    { id: "17", title: "Thodi Si Daru", artist: "AP Dhillon, Shreya Ghoshal", src: "/music/17.mp3", cover: "/music/covers/17.jpeg" },
-  ];
+  const reduceMotion = useReducedMotion();
+  const menuRef = useRef(null); // used by outside-click handlers
 
-  const filteredSongs = songs.filter(song =>
-    song.title.toLowerCase().includes(search.toLowerCase()) ||
-    song.artist.toLowerCase().includes(search.toLowerCase())
-  );
-
-  // ▶️ Play a specific song
-  const playSong = async (song) => {
-    setCurrentSong(song);
-    setIsPlaying(true);
-    
-    if (audioRef.current) {
-      audioRef.current.src = song.src;
-      audioRef.current.load();
-      audioRef.current.play();
+  // small synthesized 'love' sound (no assets, lightweight)
+  const playLoveSound = () => {
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      const ctx = new Ctx();
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = "triangle";
+      o.frequency.value = 650;
+      g.gain.value = 0;
+      o.connect(g);
+      g.connect(ctx.destination);
+      const now = ctx.currentTime;
+      g.gain.setValueAtTime(0, now);
+      g.gain.linearRampToValueAtTime(0.12, now + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + 0.25);
+      o.start(now);
+      o.stop(now + 0.28);
+      setTimeout(() => { try { ctx.close(); } catch(e){} }, 500);
+    } catch (e) {
+      // ignore - fallback gracefully
+      console.warn("sound failed", e);
     }
   };
 
-  // ⏯ Toggle play/pause
-  const togglePlay = () => {
-    if (!audioRef.current) return;
-    if (audioRef.current.paused) {
-      audioRef.current.play();
-      setIsPlaying(true);
-    } else {
-      audioRef.current.pause();
-      setIsPlaying(false);
-    }
+  // call the PlayerContext toggleLove and play a small feedback sound
+  const handleToggleLove = (songId) => {
+    toggleLove(songId); // context method
+    playLoveSound();
   };
 
-  // ⏩ Next Song
-  const playNext = () => {
-    if (!currentSong) return;
-    if (shuffle) {
-      playRandom();
-      return;
-    }
-    let currentIndex = songs.findIndex(s => s.id === currentSong.id);
-    currentIndex = (currentIndex + 1) % songs.length;
-    setCurrentSong(songs[currentIndex]);
-    setIsPlaying(true);
-  };
-
-  // ⏪ Previous Song
-  const playPrev = () => {
-    if (!currentSong) return;
-    let currentIndex = songs.findIndex(s => s.id === currentSong.id);
-    currentIndex = (currentIndex - 1 + songs.length) % songs.length;
-    setCurrentSong(songs[currentIndex]);
-    setIsPlaying(true);
-  };
-
-  // Shuffle logic
-  const playRandom = () => {
-    if (songs.length === 0) return;
-    let idx = Math.floor(Math.random() * songs.length);
-    setCurrentSong(songs[idx]);
-    setIsPlaying(true);
-  };
-
-  // Update these functions
-  const addToQueue = (song) => {
-    if (!queue.some(s => s.id === song.id)) {
-      setQueue(prevQueue => [...prevQueue, song]);
-    }
-    // Close the options menu
-    setOptionsMenu({ open: false, songId: null });
-  };
-
-  const playNextSong = (song) => {
-    if (!currentSong) {
-      playSong(song);
-      return;
-    }
-
-    setQueue(prevQueue => {
-      const newQueue = [...prevQueue];
-      const currentIndex = newQueue.findIndex(s => s.id === currentSong.id);
-      
-      if (currentIndex === -1) {
-        newQueue.unshift(song);
-      } else {
-        newQueue.splice(currentIndex + 1, 0, song);
-      }
-      
-      return newQueue;
-    });
-
-    setOptionsMenu({ open: false, songId: null });
-  };
-
-  // Add this function to handle queue completion
-  const handleQueueEnd = () => {
-    if (queue.length > 0) {
-      const nextSong = queue[0];
-      setQueue(prev => prev.slice(1));
-      playSong(nextSong);
-    }
-  };
-
-  // Update handleSongEnd to include queue
-  const handleSongEnd = () => {
-    if (repeat) {
-      audioRef.current.currentTime = 0;
-      audioRef.current.play();
-    } else if (queue.length > 0) {
-      handleQueueEnd();
-    } else {
-      shuffle ? playRandom() : playNext();
-    }
-  };
-
-  // 🔊 Handle volume change
-  const handleVolumeChange = (e) => {
-    const newVolume = parseFloat(e.target.value);
-    setVolume(newVolume);
-    if (audioRef.current) {
-      audioRef.current.volume = newVolume;
-    }
-  };
-
-  // ⏭ Seek within the song
-  const handleSeek = (e) => {
-    const seekTime = (parseFloat(e.target.value) / 100) * duration;
-    if (audioRef.current) {
-      audioRef.current.currentTime = seekTime;
-    }
-  };
-
-  // ⏱ Format time for display
-  const formatTime = (seconds) => {
-    if (!seconds || isNaN(seconds)) return "0:00";
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = Math.floor(seconds % 60);
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-  };
-
-  // 🔄 Update audio source and play/pause state reliably
-  // Effect 1: Handle song changes & play/pause
-useEffect(() => {
-  if (!audioRef.current) return;
-  if (currentSong) {
-    audioRef.current.src = currentSong.src;
-    audioRef.current.load();
-    if (isPlaying) {
-      audioRef.current.play();
-    } else {
-      audioRef.current.pause();
-    }
-  }
-}, [currentSong, isPlaying]);
-
-// Effect 2: Handle only volume change
-useEffect(() => {
-  if (audioRef.current) {
-    audioRef.current.volume = volume;
-  }
-}, [volume]);
-
-
-  // ⏲ Update currentTime and duration state from audio element
+  // Check URL param to play a specific song from other pages (e.g., library)
   useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    const updateTime = () => {
-      setCurrentTime(audio.currentTime);
-      setDuration(audio.duration || 0);
-    };
-    audio.addEventListener("timeupdate", updateTime);
-    audio.addEventListener("loadedmetadata", updateTime);
-    return () => {
-      audio.removeEventListener("timeupdate", updateTime);
-      audio.removeEventListener("loadedmetadata", updateTime);
-    };
-  }, [audioRef, currentSong]);
-
-  // ⌨️ Keyboard and media keys support
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.code === "ArrowRight") {
-        // Seek forward 5s
-        if (audioRef.current) audioRef.current.currentTime = Math.min(audioRef.current.currentTime + 5, duration);
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("play");
+    if (id) {
+      const s = songs.find(x => x.id === id);
+      if (s) {
+        playSong(s);
+        // remove param
+        params.delete("play");
+        const base = window.location.pathname + (params.toString() ? `?${params.toString()}` : "");
+        window.history.replaceState({}, "", base);
       }
-      if (e.code === "ArrowLeft") {
-        // Seek backward 5s
-        if (audioRef.current) audioRef.current.currentTime = Math.max(audioRef.current.currentTime - 5, 0);
-      }
-      if (e.code === "MediaTrackNext") playNext();
-      if (e.code === "MediaTrackPrevious") playPrev();
-      if (e.code === "MediaPlayPause") togglePlay();
-      if (e.code === "Space" && document.activeElement.tagName !== "INPUT") {
-        togglePlay();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  });
-
-  // 📊 Play/pause when clicking progress bar
-  const handleProgressClick = (e) => {
-    const rect = e.target.getBoundingClientRect();
-    const percent = (e.clientX - rect.left) / rect.width;
-    const seekTime = percent * duration;
-    if (audioRef.current) {
-      audioRef.current.currentTime = seekTime;
     }
-  };
-
-  // Add this function to calculate duration
-  const calculateDuration = (songId, audioUrl) => {
-    const audio = new Audio(audioUrl);
-    audio.addEventListener('loadedmetadata', () => {
-      setSongDurations(prev => ({
-        ...prev,
-        [songId]: audio.duration
-      }));
-    });
-  };
-const menuRef = useRef(null);
-
-useEffect(() => {
-  const handleClickOutside = (e) => {
-    if (menuRef.current && !menuRef.current.contains(e.target)) {
-      setOptionsMenu({ open: false, songId: null });
-    }
-  };
-  document.addEventListener("mousedown", handleClickOutside);
-  return () => document.removeEventListener("mousedown", handleClickOutside);
-}, []);
-
-  // Add useEffect to calculate durations when component mounts
-  useEffect(() => {
-    songs.forEach(song => {
-      calculateDuration(song.id, song.src);
-    });
   }, []);
 
+  // Filter by search AND loved / optional active playlist
+  const filteredSongs = songs.filter(song => {
+    const matchesSearch =
+      song.title.toLowerCase().includes(search.toLowerCase()) ||
+      song.artist.toLowerCase().includes(search.toLowerCase());
+    const matchesLoved = !showLovedOnly || lovedSongs.includes(song.id);
+    // If a playlist is selected, show only tracks in that playlist
+    if (typeof currentPlaylist === 'number' && playlists[currentPlaylist]) {
+      return matchesSearch && matchesLoved && playlists[currentPlaylist].songs.includes(song.id);
+    }
+    return matchesSearch && matchesLoved;
+  });
+
+  // Queue is managed by PlayerContext: use enqueue (add to end) and insertNext (play next)
+
+  // Small wrappers so existing UI callers keep working
+  function addToQueue(song) {
+    enqueue(song); // PlayerContext enqueue
+    setOptionsMenu({ open: false, songId: null });
+  }
+
+  function playNextSong(song) {
+    if (!currentSong) {
+      playSong(song);
+      setOptionsMenu({ open: false, songId: null });
+      return;
+    }
+    insertNext(song); // PlayerContext insertNext -> plays after current
+    setOptionsMenu({ open: false, songId: null });
+  }
+
+  // Create a new playlist and persist
+  function createPlaylist(name) {
+    if (typeof window === 'undefined') return;
+    const p = localStorage.getItem('cutiefy-playlists') || '[]';
+    const list = JSON.parse(p);
+    list.push({ name, songs: [] });
+    localStorage.setItem('cutiefy-playlists', JSON.stringify(list));
+    setPlaylists(Array.isArray(list) ? list : []);
+    return list.length - 1;
+  }
+
+  // Add a song to an existing playlist (persist and update state)
+  function addSongToPlaylist(playlistIndex, songId) {
+    if (typeof window === 'undefined') return;
+    const p = localStorage.getItem('cutiefy-playlists') || '[]';
+    const list = JSON.parse(p);
+    const clone = JSON.parse(JSON.stringify(list));
+    if (clone[playlistIndex] && !clone[playlistIndex].songs.includes(songId)) {
+      clone[playlistIndex].songs.push(songId);
+      localStorage.setItem('cutiefy-playlists', JSON.stringify(clone));
+      setPlaylists(clone);
+    }
+    setOptionsMenu({ open: false, songId: null });
+    setPlaylistMenu({ open: false, songId: null });
+  }
+  
+  // open playlist dropdown inside options menu
+  const openPlaylistMenu = (e, song) => {
+    e.stopPropagation();
+    setPlaylistMenu({ open: true, songId: song.id });
+  };
+
+  const handleCreatePlaylistAndAdd = (songId) => {
+    if (!newPlaylistName.trim()) return;
+    const idx = createPlaylist(newPlaylistName.trim());
+    if (typeof idx === 'number') addSongToPlaylist(idx, songId);
+    setNewPlaylistName('');
+  };
+
+  // load playlists on mount
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const p = JSON.parse(localStorage.getItem('cutiefy-playlists') || '[]');
+      setPlaylists(Array.isArray(p) ? p : []);
+    } catch (e) {
+      setPlaylists([]);
+    }
+  }, []);
+
+  // Add: format seconds to M:SS for display (safe for SSR)
+  const formatTime = (seconds) => {
+    const s = Math.max(0, Math.floor(Number(seconds) || 0));
+    const m = Math.floor(s / 60);
+    const sec = String(s % 60).padStart(2, "0");
+    return `${m}:${sec}`;
+  };
+
+  // Close options/playlist menus when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setOptionsMenu({ open: false, songId: null });
+        setPlaylistMenu({ open: false, songId: null });
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+ 
+  // Seeking / volume are handled by PlayerContext; use handleSeek(percent) and handleVolumeChange(value)
+
   return (
-    <div className="app-layout">
+    <div className={`app-layout`}>
       {/* Sidebar */}
       <aside className="sidebar">
         <div className="sidebar-logo">
           <img src="/logo.jpg" alt="Logo" />
         </div>
-        <nav>
-          {/* Remove heart button */}
+        <nav className="sidebar-nav" aria-label="Primary">
+          <Link href="/library" className="sidebar-item" title="Library">
+            <span className="sidebar-item-icon">📚</span>
+            <span className="sidebar-item-label">Library</span>
+          </Link>
+
+          <div className="sidebar-playlist-section" aria-label="Playlists">
+            <div className="sidebar-playlist-header">Playlists</div>
+            <div className="sidebar-playlist-list">
+              {playlists.length === 0 && <div className="muted" style={{ padding: '6px 0' }}>No playlists</div>}
+              {playlists.map((pl, idx) => {
+                const coverSong = songs.find(s => pl.songs.includes(s.id));
+                const cover = coverSong ? coverSong.cover : '/logo.jpg';
+                return (
+                  <button
+                    key={idx}
+                    className={`sidebar-playlist-item ${currentPlaylist === idx ? 'active' : ''}`}
+                    onClick={() => { setCurrentPlaylist(idx); setShowLovedOnly(false); }}
+                  >
+                    <img src={cover} alt="" className="sidebar-playlist-cover" />
+                    <span className="sidebar-item-label">{pl.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </nav>
-        <div className="sidebar-playlists">
-          {/* Playlist thumbnails - clickable */}
-          {songs.slice(0, 8).map(song => (
-            <img
-              key={song.id}
-              src={song.cover}
-              alt={song.title}
-              className="sidebar-thumb"
-              style={{ cursor: "pointer" }}
-              onClick={() => playSong(song)}
-              title={song.title}
-            />
-          ))}
-        </div>
       </aside>
 
       {/* Main Content */}
       <main className="main-content">
-        <header className="playlist-header">
-          <h2>Liked Songs</h2>
-        </header>
+        <header className="playlist-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h2>Your Collection</h2>
+           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <button
+              className={`view-toggle-btn ${showLovedOnly ? 'active' : ''} top-action`}
+              onClick={() => setShowLovedOnly(p => !p)}
+              title={showLovedOnly ? 'Showing loved only' : 'Show loved only'}
+            >
+              <i className={showLovedOnly ? "fa-solid fa-heart" : "fa-regular fa-heart"}></i>
+            </button>
+           </div>
+         </header>
         <div className="search-bar">
           <input
             type="text"
-            placeholder="Find in Liked Songs"
+            placeholder="Find in Songs"
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
@@ -320,20 +262,26 @@ useEffect(() => {
         <div className="song-list">
           {filteredSongs.map((song) => (
             <div
-              className={`song-row${currentSong && currentSong.id === song.id ? " playing" : ""}`}
+              className={`song-row${currentSong && currentSong.id === song.id ? " playing" : ""}${lovedSongs.includes(song.id) ? " loved-row" : ""}`}
               key={song.id}
               onClick={() => playSong(song)}
               tabIndex={0}
             >
               <img src={song.cover} className="song-thumb" alt={song.title} />
               <div className="song-meta">
-                <div className="song-title">{song.title}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div className="song-title">{song.title}</div>
+                </div>
                 <div className="song-artist">{song.artist}</div>
               </div>
               <div className="song-extra">
                 <span className="song-duration">
                   {formatTime(songDurations[song.id] || 0)}
                 </span>
+
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <LoveButton songId={song.id} isLoved={lovedSongs.includes(song.id)} onToggle={(id) => handleToggleLove(id)} onSound={playLoveSound} />
+                </div>
 
                 <div className="song-options-wrapper">
                   <button
@@ -347,29 +295,67 @@ useEffect(() => {
                   </button>
 
                   {optionsMenu.open && optionsMenu.songId === song.id && (
-                    <div className="song-options-menu" ref={menuRef}>
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          playNextSong(song);
-                        }}
+                    <div className="song-options-menu" ref={menuRef} role="menu" aria-label="Song options">
+                      <button
+                        role="menuitem"
+                        onClick={(e) => { e.stopPropagation(); insertNext(song); setOptionsMenu({ open: false, songId: null }); }}
                       >
-                        <i className="fas fa-forward-step"></i> Play Next
+                        ▶ Play Next
                       </button>
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          addToQueue(song);
-                        }}
+                      <button
+                        role="menuitem"
+                        onClick={(e) => { e.stopPropagation(); enqueue(song); setOptionsMenu({ open: false, songId: null }); }}
                       >
-                        <i className="fas fa-list"></i> Add to Queue
+                        ＋ Add to Queue
                       </button>
+
+                      {/* Add to Playlist dropdown */}
+                      <div className="playlist-section">
+                        <button
+                          role="menuitem"
+                          onClick={(e) => openPlaylistMenu(e, song)}
+                          aria-expanded={playlistMenu.open && playlistMenu.songId === song.id}
+                        >
+                          ♡ Add to Playlist
+                        </button>
+
+                        {playlistMenu.open && playlistMenu.songId === song.id && (
+                          <div className="playlist-dropdown" role="menu">
+                            {playlists.length === 0 && <div className="muted">No playlists yet</div>}
+                            {playlists.map((pl, idx) => (
+                              <div
+                                key={idx}
+                                className="playlist-item"
+                                onClick={(e) => { e.stopPropagation(); addSongToPlaylist(idx, song.id); }}
+                                role="menuitem"
+                              >
+                                {pl.name}
+                              </div>
+                            ))}
+
+                            <div className="new-playlist-row">
+                              <input
+                                placeholder="New playlist name"
+                                value={newPlaylistName}
+                                onChange={(e) => setNewPlaylistName(e.target.value)}
+                                onClick={(e) => e.stopPropagation()}
+                                aria-label="New playlist name"
+                              />
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleCreatePlaylistAndAdd(song.id); }}
+                              >
+                                Create
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
-                </div>
-              </div>
-            </div>
-          ))}
+                 </div>
+               </div>
+             </div>
+           ))}
         </div>
       </main>
 
@@ -377,7 +363,18 @@ useEffect(() => {
       {currentSong && (
         <div className="now-playing">
           <div className="now-playing-info">
-            <img src={currentSong.cover} alt={currentSong.title} className="np-thumb" />
+            <div className={`np-thumb-wrapper ${isPlaying ? 'playing' : ''}`}>
+              <motion.img
+                src={currentSong.cover}
+                alt={currentSong.title}
+                className="np-thumb"
+                animate={(!reduceMotion && isPlaying) ? { rotate: 360 } : { rotate: 0 }}
+                transition={(!reduceMotion && isPlaying) ? { repeat: Infinity, duration: 20, ease: 'linear' } : { duration: 0 }}
+                whileHover={reduceMotion ? {} : { scale: 1.04 }}
+                style={{ transformOrigin: '50% 50%' }}
+                draggable={false}
+              />
+            </div>
             <div className="np-meta">
               <div className="np-title">{currentSong.title}</div>
               <div className="np-artist">{currentSong.artist}</div>
@@ -413,7 +410,17 @@ useEffect(() => {
               >
                 <i className="fa-solid fa-repeat"></i>
               </button>
+              <button
+                className={showVisualizer ? "active" : ""}
+                onClick={() => setShowVisualizer(v => !v)}
+                title={showVisualizer ? "Hide visualizer" : "Show visualizer"}
+              >
+                <i className="fa-solid fa-chart-simple"></i>
+              </button>
             </div>
+ 
+           {/* visualizer (subtle) */}
+           <Visualizer audioRef={audioRef} isPlaying={isPlaying} show={showVisualizer} />
 
             <div className="np-progress-container">
               <input
@@ -422,7 +429,7 @@ useEffect(() => {
                 max="100"
                 step="0.1"
                 value={duration ? (currentTime / duration) * 100 : 0}
-                onInput={handleSeek}
+                onInput={(e) => handleSeek(parseFloat(e.target.value))}
                 className="np-progress"
               />
               <span className="np-time">
@@ -438,7 +445,7 @@ useEffect(() => {
               max="1"
               step="0.01"
               value={volume}
-              onInput={handleVolumeChange}
+              onInput={(e) => handleVolumeChange(parseFloat(e.target.value))}
               className="np-volume"
             />
             <button 
@@ -452,12 +459,7 @@ useEffect(() => {
         </div>
       )}
 
-      {/* Audio Element - Hidden */}
-      <audio 
-        ref={audioRef}
-        onEnded={handleSongEnd}
-        onError={(e) => console.error("Audio error:", e)}
-      />
+      {/* Audio element is managed globally by PlayerProvider via PlayerBar */}
 
       {/* Font Awesome CDN */}
       <link
@@ -474,6 +476,8 @@ useEffect(() => {
           onClose={() => setShowQueue(false)}
         />
       )}
+
+      {/* Styles moved to src/styles/globals.css — sidebar/layout styles are now centralized */}
     </div>
   );
 }
